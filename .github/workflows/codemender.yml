@@ -1,0 +1,36 @@
+name: CodeMender Scan-Only Export
+
+on:
+  schedule:
+    # Optional scheduled scan: Runs at 02:00 UTC on the 1st of every month
+    - cron: '0 2 1 * *'
+  workflow_dispatch:
+    inputs:
+      scan_target:
+        description: 'Subdirectory path to scan (default: . for repository root)'
+        required: false
+        default: '.'
+        type: string
+      build_command:
+        description: 'Custom build & test command for verification'
+        required: false
+        default: './gradlew test --no-daemon'
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+jobs:
+  scan_only:
+    uses: ./.github/workflows/codemender_scan_only.yml
+    with:
+      runner_image: 'ghcr.io/ilbzzz/codemender-runner:latest'
+      scan_target: ${{ inputs.scan_target || '.' }}
+      build_command: ${{ inputs.build_command || './gradlew test --no-daemon' }}
+    secrets:
+      gcp_workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      gcp_service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      github_app_id: ${{ secrets.GH_APP_ID }}
+      github_app_private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
