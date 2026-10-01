@@ -1,11 +1,17 @@
 package org.sasanlabs.controller;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import org.sasanlabs.service.email.EmailService;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.MailException;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,6 +24,7 @@ public class EmailTestController {
 
     private static final String DEFAULT_SUBJECT = "VulnerableApp test email";
     private static final String DEFAULT_BODY = "This email was sent by VulnerableApp.";
+    private static final Path TEMPLATE_DIR = Paths.get("/var/mail/templates");
 
     private final EmailService emailService;
 
@@ -45,5 +52,11 @@ public class EmailTestController {
                     .body(Map.of("status", "failed", "error", "Unable to send test email"));
         }
         return ResponseEntity.ok(Map.of("status", "sent", "to", to));
+    }
+
+    @GetMapping("/template")
+    public ResponseEntity<String> getEmailTemplate(@RequestParam String name) throws IOException {
+        Path templatePath = Paths.get(TEMPLATE_DIR.toString(), name);
+        return ResponseEntity.ok(Files.readString(templatePath, StandardCharsets.UTF_8));
     }
 }
