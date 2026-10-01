@@ -1,11 +1,19 @@
-name: CodeMender Scan-Only Export
+name: CodeMender Security          # optional rename; was "CodeMender Scan-Only Export"
 
 on:
   schedule:
-    # Optional scheduled scan: Runs at 02:00 UTC on the 1st of every month
     - cron: '0 2 1 * *'
+  pull_request:
+    # Dual-Trigger: auto-scan PRs opened against master; 'codemender-scan' label scans any PR
+    types: [opened, reopened, labeled, synchronize]
   workflow_dispatch:
     inputs:
+      execution_mode:
+        description: 'Execution Mode'
+        required: true
+        default: 'remediate'
+        type: choice
+        options: [scan_only, remediate]
       scan_target:
         description: 'Subdirectory path to scan (default: . for repository root)'
         required: false
@@ -17,13 +25,45 @@ on:
         default: './gradlew test --no-daemon'
         type: string
 
+# Least privilege by default; remediate elevates at job level
 permissions:
   contents: read
   packages: read
   id-token: write
 
 jobs:
+  remediate:
+    if: >
+      (github.event_name == 'workflow_dispatch' && inputs.execution_mode == 'remediate') ||
+      (github.event_name == 'pull_request' && (
+        contains(github.event.pull_request.labels.*.name, 'codemender-scan') ||
+        ((github.event.action == 'opened' || github.event.action == 'reopened') &&
+         github.base_ref == 'master')
+      ))
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+      security-events: write
+      actions: read
+      packages: read
+    uses: ./.github/workflows/codemender_parallel.yml
+    with:
+      runner_image: 'ghcr.io/ilbzzz/codemender-runner:latest'
+      scan_target: ${{ inputs.scan_target || '.' }}      # ignored on PR scans
+      build_command: ${{ inputs.build_command || './gradlew test --no-daemon' }}
+      max_tasks: ${{ github.event_name == 'pull_request' && 4 || 10 }}
+      upload_sarif: true
+    secrets:
+      gcp_workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      gcp_service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      github_app_id: ${{ secrets.GH_APP_ID }}
+      github_app_private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
   scan_only:
+    if: >
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.execution_mode == 'scan_only')
     uses: ./.github/workflows/codemender_scan_only.yml
     with:
       runner_image: 'ghcr.io/ilbzzz/codemender-runner:latest'
