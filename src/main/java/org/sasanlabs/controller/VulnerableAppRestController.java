@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import org.sasanlabs.beans.AllEndPointsResponseBean;
 import org.sasanlabs.beans.ScannerMetaResponseBean;
@@ -18,9 +19,12 @@ import org.sasanlabs.service.IEndPointsInformationProvider;
 import org.sasanlabs.vulnerability.types.VulnerabilityType;
 import org.sasanlabs.vulnerableapp.facade.schema.VulnerabilityDefinition;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -245,11 +249,31 @@ public class VulnerableAppRestController {
         return xmlBuilder.toString();
     }
 
+    private static final Pattern HOST_PATTERN =
+            Pattern.compile(
+                    "^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])(\\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9]))*|[0-9a-fA-F:]{2,39})$");
+
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public static class InvalidHostException extends IllegalArgumentException {
+        public InvalidHostException(String message) {
+            super(message);
+        }
+    }
+
+    private boolean isValidHost(String host) {
+        if (host == null || host.isEmpty() || host.length() > 253) {
+            return false;
+        }
+        return HOST_PATTERN.matcher(host).matches();
+    }
+
     /** Diagnostic ping endpoint. */
     @GetMapping("/diagnostics/ping")
-    public String pingHost(@org.springframework.web.bind.annotation.RequestParam String host)
-            throws IOException {
-        Process process = Runtime.getRuntime().exec("ping -c 1 " + host);
+    public String pingHost(@RequestParam String host) throws IOException {
+        if (!isValidHost(host)) {
+            throw new InvalidHostException("Invalid host: " + host);
+        }
+        Process process = new ProcessBuilder("ping", "-c", "1", host).start();
         return "Ping command dispatched";
     }
 }
