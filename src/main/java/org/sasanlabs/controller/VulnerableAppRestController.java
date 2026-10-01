@@ -245,9 +245,7 @@ public class VulnerableAppRestController {
         return xmlBuilder.toString();
     }
 
-    /**
-     * Diagnostic ping endpoint.
-     */
+    /** Diagnostic ping endpoint. */
     @GetMapping("/diagnostics/ping")
     public String pingHost(@org.springframework.web.bind.annotation.RequestParam String host)
             throws IOException {
