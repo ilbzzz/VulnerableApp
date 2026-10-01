@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
+import java.io.IOException;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -75,5 +76,33 @@ class EmailTestControllerTest {
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertEquals("failed", response.getBody().get("status"));
         assertEquals("Unable to send test email", response.getBody().get("error"));
+    }
+
+    @Test
+    void shouldRejectPathTraversalPayloads() throws IOException {
+        EmailTestController controller = new EmailTestController(emailService);
+
+        assertEquals(
+                HttpStatus.BAD_REQUEST,
+                controller.getEmailTemplate("../../../../etc/passwd").getStatusCode());
+        assertEquals(
+                HttpStatus.BAD_REQUEST, controller.getEmailTemplate("/etc/passwd").getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, controller.getEmailTemplate(".").getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, controller.getEmailTemplate("..").getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, controller.getEmailTemplate("").getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, controller.getEmailTemplate(null).getStatusCode());
+        assertEquals(
+                HttpStatus.BAD_REQUEST,
+                controller.getEmailTemplate("foo/../../../../etc/passwd").getStatusCode());
+        assertEquals(
+                HttpStatus.BAD_REQUEST,
+                controller
+                        .getEmailTemplate("/var/mail/templates/../../etc/passwd")
+                        .getStatusCode());
+        assertEquals(
+                HttpStatus.BAD_REQUEST,
+                controller.getEmailTemplate("/var/mail/templates").getStatusCode());
+        assertEquals(
+                HttpStatus.BAD_REQUEST, controller.getEmailTemplate("foo\0bar").getStatusCode());
     }
 }
