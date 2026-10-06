@@ -262,4 +262,33 @@ class VulnerableAppRestControllerTest {
                 new ExpectedIssue("CWE-89", "SQL Injection", "src/main/java/Foo.java", 40, 1),
                 new ExpectedIssue("CWE-79", "Reflected XSS", "src/main/java/Bar.java", 42, 3));
     }
+
+    @Test
+    void pingHost_withInvalidHost_mockMvcReturnsBadRequest() throws Exception {
+        mockMvc.perform(get("/diagnostics/ping").param("host", "127.0.0.1 & id"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void pingHost_withCommandInjectionPayloads_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class, () -> controller.pingHost("127.0.0.1 & id"));
+        assertThrows(IllegalArgumentException.class, () -> controller.pingHost("127.0.0.1; ls"));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> controller.pingHost("127.0.0.1 | cat /etc/passwd"));
+        assertThrows(IllegalArgumentException.class, () -> controller.pingHost("-c 1"));
+        assertThrows(IllegalArgumentException.class, () -> controller.pingHost(""));
+        assertThrows(IllegalArgumentException.class, () -> controller.pingHost(null));
+    }
+
+    @Test
+    void pingHost_withValidHost_dispatchesPingOrThrowsIOException() {
+        try {
+            String result = controller.pingHost("127.0.0.1");
+            assertEquals("Ping command dispatched", result);
+        } catch (IOException e) {
+            // Expected in CI environments where 'ping' is not installed
+            assertTrue(e.getMessage().contains("ping") || e.getMessage().contains("error=2"));
+        }
+    }
 }
