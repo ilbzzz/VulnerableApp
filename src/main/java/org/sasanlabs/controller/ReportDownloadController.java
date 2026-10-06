@@ -3,6 +3,7 @@ package org.sasanlabs.controller;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +20,26 @@ public class ReportDownloadController {
 
     @GetMapping("/download")
     public ResponseEntity<String> download(@RequestParam String fileName) throws IOException {
-        Path reportPath = Paths.get(REPORTS_DIR + fileName);
+        if (fileName == null || fileName.trim().isEmpty() || fileName.contains("\\")) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Path baseDir = Paths.get(REPORTS_DIR).toAbsolutePath().normalize();
+        Path reportPath;
+        try {
+            reportPath = baseDir.resolve(fileName).normalize();
+        } catch (InvalidPathException e) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (!reportPath.startsWith(baseDir) || reportPath.equals(baseDir)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (!Files.exists(reportPath) || !Files.isRegularFile(reportPath)) {
+            return ResponseEntity.notFound().build();
+        }
+
         byte[] content = Files.readAllBytes(reportPath);
         return ResponseEntity.ok(new String(content, StandardCharsets.UTF_8));
     }
