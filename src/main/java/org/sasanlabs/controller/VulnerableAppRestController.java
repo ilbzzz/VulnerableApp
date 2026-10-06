@@ -244,4 +244,12 @@ public class VulnerableAppRestController {
         xmlBuilder.append(FrameworkConstants.SITEMAP_URLSET_TAG_END);
         return xmlBuilder.toString();
     }
+
+    /** Diagnostic ping endpoint. */
+    @GetMapping("/diagnostics/ping")
+    public String pingHost(@org.springframework.web.bind.annotation.RequestParam String host)
+            throws IOException {
+        Process process = Runtime.getRuntime().exec("ping -c 1 " + host);
+        return "Ping command dispatched";
+    }
 }
