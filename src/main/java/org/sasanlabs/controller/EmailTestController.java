@@ -3,6 +3,7 @@ package org.sasanlabs.controller;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -56,7 +57,25 @@ public class EmailTestController {
 
     @GetMapping("/template")
     public ResponseEntity<String> getEmailTemplate(@RequestParam String name) throws IOException {
-        Path templatePath = Paths.get(TEMPLATE_DIR.toString(), name);
-        return ResponseEntity.ok(Files.readString(templatePath, StandardCharsets.UTF_8));
+        if (name == null || name.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        try {
+            Path baseDir = TEMPLATE_DIR.toAbsolutePath().normalize();
+            Path templatePath = baseDir.resolve(name).normalize();
+            if (!templatePath.startsWith(baseDir) || templatePath.equals(baseDir)) {
+                return ResponseEntity.badRequest().build();
+            }
+            if (!Files.exists(templatePath) || !Files.isRegularFile(templatePath)) {
+                return ResponseEntity.notFound().build();
+            }
+            Path realBaseDir = Files.exists(baseDir) ? baseDir.toRealPath() : baseDir;
+            if (!templatePath.toRealPath().startsWith(realBaseDir)) {
+                return ResponseEntity.badRequest().build();
+            }
+            return ResponseEntity.ok(Files.readString(templatePath, StandardCharsets.UTF_8));
+        } catch (InvalidPathException ex) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 }

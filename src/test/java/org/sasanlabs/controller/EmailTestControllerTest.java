@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
+import java.io.IOException;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -75,5 +76,37 @@ class EmailTestControllerTest {
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertEquals("failed", response.getBody().get("status"));
         assertEquals("Unable to send test email", response.getBody().get("error"));
+    }
+
+    @Test
+    void shouldRejectPathTraversalInEmailTemplate() throws IOException {
+        EmailTestController controller = new EmailTestController(emailService);
+
+        ResponseEntity<String> response = controller.getEmailTemplate("../../../../etc/passwd");
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void shouldRejectAbsolutePathInEmailTemplate() throws IOException {
+        EmailTestController controller = new EmailTestController(emailService);
+
+        ResponseEntity<String> response = controller.getEmailTemplate("/etc/passwd");
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void shouldRejectBlankNameInEmailTemplate() throws IOException {
+        EmailTestController controller = new EmailTestController(emailService);
+
+        ResponseEntity<String> response = controller.getEmailTemplate("   ");
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void shouldReturnNotFoundForNonExistentTemplate() throws IOException {
+        EmailTestController controller = new EmailTestController(emailService);
+
+        ResponseEntity<String> response = controller.getEmailTemplate("nonexistent.html");
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
 }
