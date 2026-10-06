@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import org.sasanlabs.beans.AllEndPointsResponseBean;
 import org.sasanlabs.beans.ScannerMetaResponseBean;
@@ -245,11 +246,33 @@ public class VulnerableAppRestController {
         return xmlBuilder.toString();
     }
 
+    private static final Pattern HOST_PATTERN =
+            Pattern.compile(
+                    "^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])"
+                            + "(\\.[a-zA-Z0-9]([a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?)*\\.?$|"
+                            + "^[0-9a-fA-F]{0,4}(:[0-9a-fA-F]{0,4}){1,7}$");
+
+    private boolean isValidHost(String host) {
+        return host != null
+                && !host.isEmpty()
+                && host.length() <= 253
+                && !host.startsWith("-")
+                && HOST_PATTERN.matcher(host).matches();
+    }
+
     /** Diagnostic ping endpoint. */
     @GetMapping("/diagnostics/ping")
-    public String pingHost(@org.springframework.web.bind.annotation.RequestParam String host)
-            throws IOException {
-        Process process = Runtime.getRuntime().exec("ping -c 1 " + host);
-        return "Ping command dispatched";
+    public ResponseEntity<String> pingHost(
+            @org.springframework.web.bind.annotation.RequestParam String host) throws IOException {
+        if (!isValidHost(host)) {
+            return ResponseEntity.badRequest().body("Invalid host");
+        }
+        boolean isWindows = System.getProperty("os.name").toLowerCase().startsWith("windows");
+        ProcessBuilder processBuilder =
+                isWindows
+                        ? new ProcessBuilder("ping", "-n", "1", host)
+                        : new ProcessBuilder("ping", "-c", "1", host);
+        processBuilder.start();
+        return ResponseEntity.ok("Ping command dispatched");
     }
 }
