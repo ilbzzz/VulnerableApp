@@ -1,9 +1,11 @@
 package org.sasanlabs.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
+import java.io.IOException;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -75,5 +77,56 @@ class EmailTestControllerTest {
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertEquals("failed", response.getBody().get("status"));
         assertEquals("Unable to send test email", response.getBody().get("error"));
+    }
+
+    @Test
+    void shouldRejectPathTraversalTemplate() throws IOException {
+        EmailTestController controller = new EmailTestController(emailService);
+
+        ResponseEntity<String> response = controller.getEmailTemplate("../../../../etc/passwd");
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNull(response.getBody());
+    }
+
+    @Test
+    void shouldRejectAbsolutePathTemplate() throws IOException {
+        EmailTestController controller = new EmailTestController(emailService);
+
+        ResponseEntity<String> response = controller.getEmailTemplate("/etc/passwd");
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNull(response.getBody());
+    }
+
+    @Test
+    void shouldRejectNonExistentTemplate() throws IOException {
+        EmailTestController controller = new EmailTestController(emailService);
+
+        ResponseEntity<String> response = controller.getEmailTemplate("nonexistent.html");
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNull(response.getBody());
+    }
+
+    @Test
+    void shouldRejectEmptyOrDotTemplate() throws IOException {
+        EmailTestController controller = new EmailTestController(emailService);
+
+        ResponseEntity<String> emptyResponse = controller.getEmailTemplate("");
+        assertEquals(HttpStatus.NOT_FOUND, emptyResponse.getStatusCode());
+
+        ResponseEntity<String> dotResponse = controller.getEmailTemplate(".");
+        assertEquals(HttpStatus.NOT_FOUND, dotResponse.getStatusCode());
+    }
+
+    @Test
+    void shouldRejectNullTemplate() throws IOException {
+        EmailTestController controller = new EmailTestController(emailService);
+
+        ResponseEntity<String> response = controller.getEmailTemplate(null);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNull(response.getBody());
     }
 }
