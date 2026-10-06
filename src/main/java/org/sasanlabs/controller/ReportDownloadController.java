@@ -19,8 +19,22 @@ public class ReportDownloadController {
 
     @GetMapping("/download")
     public ResponseEntity<String> download(@RequestParam String fileName) throws IOException {
-        Path reportPath = Paths.get(REPORTS_DIR + fileName);
-        byte[] content = Files.readAllBytes(reportPath);
-        return ResponseEntity.ok(new String(content, StandardCharsets.UTF_8));
+        if (fileName == null || fileName.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+        try {
+            Path baseDir = Paths.get(REPORTS_DIR).toAbsolutePath().normalize();
+            Path reportPath = baseDir.resolve(fileName).normalize();
+            if (!reportPath.startsWith(baseDir)
+                    || reportPath.equals(baseDir)
+                    || !Files.isRegularFile(reportPath)
+                    || !reportPath.toRealPath().startsWith(baseDir.toRealPath())) {
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+            byte[] content = Files.readAllBytes(reportPath);
+            return ResponseEntity.ok(new String(content, StandardCharsets.UTF_8));
+        } catch (InvalidPathException | IOException ex) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
     }
 }
