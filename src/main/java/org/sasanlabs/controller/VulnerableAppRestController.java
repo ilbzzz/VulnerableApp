@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import org.sasanlabs.beans.AllEndPointsResponseBean;
 import org.sasanlabs.beans.ScannerMetaResponseBean;
@@ -245,11 +246,21 @@ public class VulnerableAppRestController {
         return xmlBuilder.toString();
     }
 
+    private static final Pattern HOST_PATTERN =
+            Pattern.compile("^([a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?|[a-fA-F0-9:]+)$");
+
     /** Diagnostic ping endpoint. */
     @GetMapping("/diagnostics/ping")
     public String pingHost(@org.springframework.web.bind.annotation.RequestParam String host)
             throws IOException {
-        Process process = Runtime.getRuntime().exec("ping -c 1 " + host);
+        if (host == null
+                || host.isEmpty()
+                || host.length() > 255
+                || host.contains("..")
+                || !HOST_PATTERN.matcher(host).matches()) {
+            throw new IllegalArgumentException("Invalid host parameter");
+        }
+        Process process = new ProcessBuilder("ping", "-c", "1", host).start();
         return "Ping command dispatched";
     }
 }
