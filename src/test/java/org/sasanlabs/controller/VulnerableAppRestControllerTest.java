@@ -37,6 +37,7 @@ import org.sasanlabs.benchmark.model.ExpectedIssue;
 import org.sasanlabs.benchmark.service.IExpectedIssuesProvider;
 import org.sasanlabs.service.IEndPointsInformationProvider;
 import org.sasanlabs.vulnerability.types.VulnerabilityType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -255,6 +256,37 @@ class VulnerableAppRestControllerTest {
         when(expectedIssuesProvider.getExpectedIssues()).thenThrow(new IOException("boom"));
 
         assertThrows(IOException.class, () -> controller.getSastScannerRelatedInformation());
+    }
+
+    @Test
+    void pingHost_withInvalidHost_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/diagnostics/ping").param("host", "127.0.0.1;id"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Invalid host"));
+
+        mockMvc.perform(get("/diagnostics/ping").param("host", "127.0.0.1 && id"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Invalid host"));
+
+        mockMvc.perform(get("/diagnostics/ping").param("host", "-c 1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Invalid host"));
+
+        mockMvc.perform(get("/diagnostics/ping").param("host", "host`id`"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Invalid host"));
+    }
+
+    @Test
+    void pingHost_withValidHost_dispatchesPingOrFailsIfBinaryMissing() {
+        try {
+            ResponseEntity<String> response = controller.pingHost("127.0.0.1");
+            assertEquals(200, response.getStatusCodeValue());
+            assertEquals("Ping command dispatched", response.getBody());
+        } catch (IOException e) {
+            // ping binary might not be available in test container
+            assertTrue(e.getMessage().contains("ping"));
+        }
     }
 
     private static List<ExpectedIssue> twoExpectedIssues() {
