@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import org.sasanlabs.beans.AllEndPointsResponseBean;
 import org.sasanlabs.beans.ScannerMetaResponseBean;
@@ -245,11 +246,41 @@ public class VulnerableAppRestController {
         return xmlBuilder.toString();
     }
 
+    private static final Pattern HOSTNAME_OR_IPV4_PATTERN =
+            Pattern.compile(
+                    "^([a-zA-Z0-9]([a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?\\.)*[a-zA-Z0-9]([a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?$");
+
+    private static final Pattern IPV6_PATTERN =
+            Pattern.compile("^[0-9a-fA-F]{0,4}(:[0-9a-fA-F]{0,4}){1,7}$");
+
+    private boolean isValidHost(String host) {
+        if (host == null || host.isEmpty()) {
+            return false;
+        }
+        if (host.length() <= 253 && HOSTNAME_OR_IPV4_PATTERN.matcher(host).matches()) {
+            return true;
+        }
+        if (host.length() <= 45
+                && host.contains(":")
+                && !host.equals(":")
+                && IPV6_PATTERN.matcher(host).matches()) {
+            return true;
+        }
+        return false;
+    }
+
     /** Diagnostic ping endpoint. */
     @GetMapping("/diagnostics/ping")
-    public String pingHost(@org.springframework.web.bind.annotation.RequestParam String host)
-            throws IOException {
-        Process process = Runtime.getRuntime().exec("ping -c 1 " + host);
-        return "Ping command dispatched";
+    public ResponseEntity<String> pingHost(
+            @org.springframework.web.bind.annotation.RequestParam String host) throws IOException {
+        if (host == null) {
+            return ResponseEntity.badRequest().body("Invalid host");
+        }
+        String trimmedHost = host.trim();
+        if (!isValidHost(trimmedHost)) {
+            return ResponseEntity.badRequest().body("Invalid host");
+        }
+        new ProcessBuilder("ping", "-c", "1", trimmedHost).start();
+        return ResponseEntity.ok("Ping command dispatched");
     }
 }
